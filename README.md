@@ -66,8 +66,9 @@ this repository and are not redistributed by it. See
 | --- | --- |
 | GPU | NVIDIA ships DLSS 5 for the RTX 50 series. Through this community runtime it also runs on RTX 40 and 30. RTX 20 and older are refused |
 | Driver | Current NVIDIA GeForce driver |
+| OS | Windows, or Linux x86-64 with Wine (experimental; see [docs/linux.md](docs/linux.md)) |
 | ComfyUI | A build with the V3 node API (`comfy_api.latest`) |
-| Python | `numpy`, `av` and OpenCV. ComfyUI portable normally ships all three; `opencv-python` is deliberately not in `requirements.txt` so it cannot overwrite an existing `opencv-contrib-python` |
+| Python | `numpy`, `av` and OpenCV. ComfyUI portable normally ships all three; `opencv-python` is deliberately not in `requirements.txt` so it cannot overwrite an existing `opencv-contrib-python`. On Linux the system `ffmpeg`/`ffprobe` replace the bundled Windows builds |
 
 ## Installation
 
@@ -129,6 +130,21 @@ starts, so a missing binary fails immediately rather than after the job: the
 
 The nodes appear under **image/upscaling**. If you restart before installing the runtime, they
 load normally and only fail when executed, with a message that says how to install it.
+
+### Linux
+
+Steps 1 and 2 work the same on Linux (the runtime is the same Windows release and the
+system `ffmpeg` replaces the bundled one), then configure Wine once:
+
+```bash
+python3 scripts/setup_linux.py --proton <GE-Proton-or-equivalent-directory> \
+    --comfyui <ComfyUI> --python <ComfyUI python> --verify
+```
+
+ComfyUI, PyTorch and FFmpeg stay native; only the DLSS worker runs through Wine in a
+dedicated prefix shared with the ComfyUI DLSS pack family. The full recipe, including
+the patched ReShade carrier the worker needs under VKD3D-Proton, is in
+[docs/linux.md](docs/linux.md).
 
 ## Nodes
 
@@ -327,7 +343,9 @@ One measurement, RTX 5090 with driver 610.74, 640x360 to 1280x720 at 2x Performa
   ffprobe counting pass is treated as authoritative and fails the run.
 - Running the video node twice with identical inputs replays the cached result and writes no
   new file. Change an input, or the source file, to render again.
-- Windows only. The worker, the carrier and the add-on are Windows binaries.
+- On Linux the worker runs through Wine. The setup, quirks and the patched ReShade carrier
+  it requires are documented in [docs/linux.md](docs/linux.md); feature-18 verification is
+  unchanged and still fails the run when neural rendering cannot be proven.
 
 ## Troubleshooting
 
@@ -349,27 +367,33 @@ One measurement, RTX 5090 with driver 610.74, 640x360 to 1280x720 at 2x Performa
 | `crashed inside feature-18 evaluation (access violation)` | Driver and RenoDX or DLSS NR versions do not match. Update the driver and reinstall the runtime |
 | `feature-18 execution was not verified` | The worker ran but produced no neural rendering evidence. Most often another process was using the GPU. Run it again with nothing else rendering |
 | `AV1 NVENC cannot encode ...` | The GPU or driver cannot encode that resolution in AV1. Use H.264 or HEVC |
+| `The Linux DLSS 5 staging directory ... is incomplete` | Linux only. Run `scripts/setup_linux.py`; see [docs/linux.md](docs/linux.md) |
+| `No adapters found` / `CreateDXGIFactory1 failed` | Linux only. The Vulkan device name filter does not match what the driver reports; pass `--vulkan-name` to the setup script |
 
 ## Project layout
 
 ```
 ComfyUI-DLSS5-Enhancer/
   install_runtime.py     Download or register the native runtime
+  scripts/setup_linux.py Linux Wine/prefix/carrier configuration helper
   selftest.py            Protocol smoke test without ComfyUI
   dlss5/
     protocol.py          Binary wire format (version 4)
     session.py           Worker lifecycle, handshake, frame streaming
+    workers.py           Worker launch: direct on Windows, Wine on Linux
     motion.py            Optical flow temporal guides and scene cut resets
     settings.py          Public controls and their native translation
-    paths.py             Runtime discovery and validation
+    paths.py             Runtime discovery, validation and Linux staging
     diagnostics.py       GPU checks, feature 18 proof, failure analysis
     imaging.py           IMAGE tensor and RGBA8 conversion, letterboxing
     media.py             Probing, decoding, NVENC encoding, muxing
     selftest.py          The smoke test itself
   nodes/                 The three ComfyUI nodes
+  tests/                 CPU-only regression tests (Linux port)
   config.json            Written by install_runtime.py, not tracked
   runtime/               Native runtime, not tracked
-  ffmpeg/                Bundled ffmpeg, not tracked
+  runtime-linux/         Linux staging: worker copy, carrier, links; not tracked
+  ffmpeg/                Bundled ffmpeg (Windows only), not tracked
 ```
 
 To uninstall, delete the node folder. The runtime, `config.json` and any bundled ffmpeg live
