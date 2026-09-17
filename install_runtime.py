@@ -52,7 +52,14 @@ only its runtime components:
 These files are neither owned nor redistributed by this node pack. Install only
 components you are authorised to use, from sources their licences permit. This
 project is not affiliated with NVIDIA, ReShade, RenoDX or the upstream project.
+
+On Linux the runtime binaries are the same Windows files and run through
+Wine. The Windows ffmpeg is not extracted there; use the system ffmpeg.
+Afterwards run scripts/setup_linux.py once to configure the Wine prefix,
+the driver bridge and the patched ReShade carrier. See docs/linux.md.
 """
+
+IS_LINUX = sys.platform == "linux"
 
 
 def _download(url: str, target: Path) -> Path:
@@ -126,8 +133,9 @@ def _extract(archive_path: Path) -> None:
     with zipfile.ZipFile(archive_path) as archive:
         groups = (
             ("bin/runtime/", RUNTIME_TARGET),
-            ("bin/ffmpeg/bin/", FFMPEG_TARGET),
         )
+        if not IS_LINUX:
+            groups += (("bin/ffmpeg/bin/", FFMPEG_TARGET),)
         for marker, target in groups:
             members = _members(archive, marker)
             if not members:
@@ -169,12 +177,21 @@ def _register(runtime_dir: Path) -> None:
             f"{runtime_dir} is not a DLSS 5 runtime directory. Missing: {', '.join(missing)}"
         )
     ffmpeg_dir = runtime_dir.parent / "ffmpeg" / "bin"
-    if not ffmpeg_dir.is_dir():
+    if ffmpeg_dir.is_dir():
+        config = write_config(runtime_dir, ffmpeg_dir)
+    elif IS_LINUX:
+        config = write_config(runtime_dir)
+        print(
+            "Note: Linux uses the system ffmpeg; none was extracted next to "
+            "the runtime. The video node needs ffmpeg and ffprobe on PATH or "
+            "in DLSS5_FFMPEG_DIR."
+        )
+    else:
+        config = write_config(runtime_dir)
         print(
             "Warning: no ffmpeg found next to the runtime. The image node works, but "
             "the video node needs ffmpeg on PATH or in DLSS5_FFMPEG_DIR."
         )
-    config = write_config(runtime_dir, ffmpeg_dir if ffmpeg_dir.is_dir() else None)
     print(f"Registered {runtime_dir}")
     print(f"Wrote {config}")
 
@@ -208,17 +225,33 @@ def main() -> None:
             shutil.copy2(archive, PACKAGE_ROOT / archive.name)
 
     layout = RuntimeLayout(root=RUNTIME_TARGET).validate()
-    missing = [
-        name for name in ("ffmpeg.exe", "ffprobe.exe") if not (FFMPEG_TARGET / name).is_file()
-    ]
-    if missing:
-        raise SystemExit(
-            f"The archive did not provide {', '.join(missing)} in {FFMPEG_TARGET}. "
-            "The image node works, but the video node needs them."
+    if IS_LINUX:
+        if not (shutil.which("ffmpeg") and shutil.which("ffprobe")):
+            print(
+                "Warning: ffmpeg/ffprobe are not on PATH. The image node works, "
+                "but the video node needs them on PATH or in DLSS5_FFMPEG_DIR."
+            )
+        config = write_config(layout.root)
+        print(f"Runtime ready in {layout.root}")
+        print(f"Wrote {config}")
+        print(
+            "Linux: now run scripts/setup_linux.py once to configure the Wine "
+            "prefix, the driver bridge and the patched ReShade carrier."
         )
-    config = write_config(layout.root, FFMPEG_TARGET)
-    print(f"Runtime ready in {layout.root}")
-    print(f"Wrote {config}")
+    else:
+        missing = [
+            name
+            for name in ("ffmpeg.exe", "ffprobe.exe")
+            if not (FFMPEG_TARGET / name).is_file()
+        ]
+        if missing:
+            raise SystemExit(
+                f"The archive did not provide {', '.join(missing)} in {FFMPEG_TARGET}. "
+                "The image node works, but the video node needs them."
+            )
+        config = write_config(layout.root, FFMPEG_TARGET)
+        print(f"Runtime ready in {layout.root}")
+        print(f"Wrote {config}")
     print("Restart ComfyUI to use the DLSS5 nodes.")
 
 
