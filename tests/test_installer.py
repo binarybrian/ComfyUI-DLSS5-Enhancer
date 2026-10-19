@@ -16,6 +16,7 @@ from dlss5.runtime_archive import (  # noqa: E402
     select_runtime_members,
     selected_nr_arch,
 )
+import install_runtime  # noqa: E402
 
 
 FLAT_V3 = [
@@ -134,6 +135,22 @@ class ArchTests(unittest.TestCase):
             HOST_V6, gpu_name="NVIDIA GeForce RTX 5090"
         )
         self.assertEqual(selected_nr_arch(selected), "blackwell")
+
+
+class ArchiveNameTests(unittest.TestCase):
+    def test_kept_archive_uses_the_release_filename(self):
+        self.assertEqual(
+            install_runtime.archive_name(install_runtime.RELEASE_URL),
+            "DLSS.5.Visual.Enhancer.v6.0.zip",
+        )
+
+    def test_query_string_does_not_leak_into_the_name(self):
+        self.assertEqual(
+            install_runtime.archive_name(
+                "https://example.invalid/releases/v6.0/Package.zip?x=1"
+            ),
+            "Package.zip",
+        )
 
 
 class PythonDiscoveryTests(unittest.TestCase):

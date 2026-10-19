@@ -17,6 +17,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import urllib.parse
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -172,6 +173,11 @@ def _extract_tree(archive: zipfile.ZipFile, marker: str, target: Path) -> None:
         print(f"Skipped unsafe archive entry: {name}")
 
 
+def archive_name(url: str) -> str:
+    """Name a kept archive after the release file, not the temp download."""
+    return Path(urllib.parse.urlparse(url).path).name or "release.zip"
+
+
 def gpu_name() -> str | None:
     """Ask nvidia-smi for the first GPU, tolerating machines without it."""
     try:
@@ -294,7 +300,7 @@ def main() -> None:
         archive = _download(arguments.url, Path(workspace) / "release.zip")
         _extract(archive, arguments.nr_arch)
         if arguments.keep_archive:
-            shutil.copy2(archive, PACKAGE_ROOT / archive.name)
+            shutil.copy2(archive, PACKAGE_ROOT / archive_name(arguments.url))
 
     layout = RuntimeLayout(root=RUNTIME_TARGET).validate()
     if IS_LINUX:
