@@ -93,9 +93,10 @@ python_embeded\python.exe ComfyUI\custom_nodes\ComfyUI-DLSS5-Enhancer\install_ru
 ```
 
 It prints the licensing notice, asks for confirmation, downloads the third-party DLSS 5 Visual
-Enhancer release v3.0 from its GitHub releases page (about 467 MB, roughly 700 MB on disk after
-extraction) and extracts only its `bin/runtime` and `bin/ffmpeg/bin` contents into the node
-folder.
+Enhancer release v6.0 from its GitHub releases page (about 856 MB; the installer extracts only
+the runtime components, about 240 MB on Linux and roughly 700 MB on Windows including ffmpeg)
+and installs them into the node folder. It also selects the Neural Rendering runtime for the
+installed GPU (RTX 20/30 Turing, RTX 40 Ada, RTX 50 Blackwell); `--nr-arch` overrides the choice.
 
 If you already have that application installed, register it instead of downloading again:
 
@@ -104,8 +105,10 @@ python_embeded\python.exe ComfyUI\custom_nodes\ComfyUI-DLSS5-Enhancer\install_ru
     --runtime-dir "D:\DLSS 5 Visual Enhancer\bin\runtime"
 ```
 
-Release v3.0 is what this pack is built against; it speaks worker protocol version 4. An older
-release fails at session setup with a protocol message.
+Release v6.0 is what this pack is built against; it speaks worker protocol version 4. It is the
+newest upstream release with the standalone worker this pack drives: v7.0 moved the add-on into
+`dlssnr/`, v8.0 replaced the worker with the Neuroframe Engine, and v13.0+ dropped the ReShade
+carrier and RenoDX add-on. An older release fails at session setup with a protocol message.
 
 Additional flags: `--url` overrides the download, `--yes` skips the prompt for unattended
 installs, `--keep-archive` keeps the downloaded zip.
@@ -360,7 +363,7 @@ One measurement, RTX 5090 with driver 610.74, 640x360 to 1280x720 at 2x Performa
 | `OpenCV is required` | Install `opencv-python`, or `opencv-contrib-python` if you already use it |
 | `The PyAV package is required` | Only the video node needs it: `python_embeded\python.exe -m pip install av` |
 | `needs the tested experimental Ampere pair` | RTX 30 only runs with the verified RenoDX 4.70 and DLSS NR 310.8.SF-v2 files, checked by SHA-256. The message prints the hashes actually installed |
-| `does not speak the version-4 protocol` | The registered runtime is from a different release. Use v3.0 |
+| `does not speak the version-4 protocol` | The registered runtime is from a different release. Use v6.0 |
 | `ffmpeg/ffprobe were not found` | Only the video node needs them. Set `DLSS5_FFMPEG_DIR` or put them on `PATH` |
 | `DLSS <mode> is unavailable for ...` | The driver rejected that output size. Choose a lower upscaling mode |
 | `applied DLSS model preset X instead of the requested Y` | The runtime does not support that model. Set `dlss_model_preset` to Default |

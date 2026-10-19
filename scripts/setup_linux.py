@@ -49,6 +49,15 @@ def absolute(value):
     return Path(value).expanduser().absolute()
 
 
+def default_python(comfyui):
+    """Find ComfyUI's virtualenv the way current checkouts lay it out."""
+    for relative in ("venv/bin/python", ".venv/bin/python"):
+        candidate = comfyui / relative
+        if candidate.is_file():
+            return candidate
+    return comfyui / "venv/bin/python"
+
+
 def require(condition, message):
     if not condition:
         raise RuntimeError(message)
@@ -126,7 +135,8 @@ def main(argv=None):
     parser.add_argument(
         "--python",
         type=absolute,
-        help="ComfyUI Python; default: COMFYUI/.venv/bin/python",
+        help="ComfyUI Python; default: COMFYUI/venv/bin/python "
+        "(falling back to COMFYUI/.venv/bin/python)",
     )
     parser.add_argument(
         "--prefix",
@@ -177,7 +187,7 @@ def main(argv=None):
     files = args.proton
     if (files / "files").is_dir():
         files /= "files"
-    python = args.python or args.comfyui / ".venv/bin/python"
+    python = args.python or default_python(args.comfyui)
     wine = files / "bin/wine"
     server = files / "bin/wineserver"
     for executable in (wine, server, python):
